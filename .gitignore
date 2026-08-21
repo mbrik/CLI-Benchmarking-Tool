@@ -13,6 +13,7 @@
 
 # Specific binaries
 go-bench
+api-benchmark
 
 # OS / Editor files
 .DS_Store
@@ -21,3 +22,4 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
