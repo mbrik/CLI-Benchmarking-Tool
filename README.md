@@ -1,58 +1,61 @@
-# API Benchmark
+# ⚡ CLI Benchmarking Tool (`go-bench`)
 
-API Benchmark is a lightweight command-line tool for measuring HTTP endpoint
-throughput, latency, status codes, and request failures. It repeats one request
-configuration through a bounded goroutine worker pool and prints the result as
-terminal text or JSON.
+A fast, lightweight, and memory-efficient HTTP load generator and benchmarking tool written in Go. Evaluates throughput, latency percentiles, status codes, and network failures with bounded memory and graceful shutdown.
 
-## Features
+---
 
-- Bounded worker pool with configurable concurrency.
-- Optional maximum request start rate for paced benchmarks.
-- Support for any valid HTTP method.
-- Repeatable custom headers and optional request bodies.
-- Per-request timeout covering the complete HTTP exchange.
-- Connection pooling and response-body draining for connection reuse.
-- Estimated and successful throughput.
-- Average, minimum, maximum, P50, P90, P95, and P99 successful latency.
-- HTTP status code and request error distributions.
-- Text output for humans and JSON output for scripts.
-- Sensitive header redaction in displayed configuration.
-- Graceful cancellation for interrupt signals and `SIGTERM`.
+## ✨ Features
 
-## Requirements
+- **🚀 Bounded Concurrency**: Efficient worker pool architecture with bounded channel capacity and zero memory bloat (`min(N, C)` goroutines).
+- **⏱️ Request Rate Pacing**: Optional `-r` / `-rate` flag to space request starts and avoid triggering rate limiters.
+- **🔄 Any HTTP Method**: Full support for `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`, and more.
+- **📋 Custom Headers & Body**: Repeatable `-H` / `-header` flags and raw payload support (`-d`, `-data`, `-body`).
+- **🔒 Sensitive Header Redaction**: Automatically hides `Authorization`, `Cookie`, tokens, secrets, and API keys in reports.
+- **🛡️ Graceful Shutdown**: Listens for `Ctrl+C` (`SIGINT` / `SIGTERM`) to cancel in-flight requests and show partial summaries.
+- **📊 Rich Performance Metrics**:
+  - **Throughput**: Estimated throughput vs. Successful throughput.
+  - **Latency Percentiles**: P50, P90, P95, P99, Average, Min, and Max (calculated strictly on successful `2xx-3xx` requests).
+  - **Status Code Distribution**: Full breakdown of all returned HTTP statuses (`200 OK`, `429 Too Many Requests`, etc.).
+  - **Error Breakdown**: Network timeouts, connection drops, and truncated response bodies.
+- **🤖 Output Formats**: Human-friendly terminal text (default) or machine-readable JSON (`-format json`).
 
-- Go 1.26.4 or later.
+---
 
-## Installation
+## 📦 Installation & Setup
 
-Clone and build the executable:
+### Prerequisites
+- [Go](https://go.dev/dl/) `1.20+` installed.
 
+### Build from Source
 ```bash
-git clone https://github.com/rahmannugar/api-benchmark.git
-cd api-benchmark
-go build -o api-benchmark .
+# Clone the repository
+git clone https://github.com/mbrik/CLI-Benchmarking-Tool.git
+cd CLI-Benchmarking-Tool/go-bench
+
+# Build executable
+go build -o go-bench .
 ```
 
-The executable name comes from the `-o` argument. On Windows, use:
-
+On Windows, use:
 ```powershell
-go build -o api-benchmark.exe .
+go build -o go-bench.exe .
 ```
 
-During development, the tool can also run without a separate build step:
-
+During development, the tool can also run directly:
 ```bash
 go run . -url "http://localhost:8080/health" -n 100 -c 10
 ```
 
-## Usage
+---
+
+## 🛠️ CLI Flags & Usage
 
 ```text
-api-benchmark [flags]
+go-bench [flags]
 
+Flags:
   -url string
-        Target URL (default "http://localhost:8080")
+        Target URL to benchmark (default "http://localhost:8080")
   -m, -method string
         HTTP method (default "GET")
   -n int
@@ -64,60 +67,60 @@ api-benchmark [flags]
   -H, -header value
         Custom header in "Name: Value" form; repeat for multiple headers
   -d, -data, -body string
-        Request body
+        Request payload / data string
   -t, -timeout duration
-        Per-request timeout (default 10s)
+        Per-request timeout duration, e.g. 5s, 10s, 1m (default 10s)
   -format string
         Output format: text or json (default "text")
+  -help
+        Show help documentation
 ```
 
-Total requests, concurrency, timeout, method, URL, and headers are validated
-before workers start. Concurrency cannot exceed the total request count.
+> Total requests, concurrency, timeout, method, URL, and headers are validated before workers start. Concurrency cannot exceed the total request count.
 
-## Examples
+---
 
-### GET endpoint
+## 🚀 Examples
 
+### 1. Basic GET Benchmark
 Run 2,000 total requests using 20 concurrent workers:
-
 ```bash
-./api-benchmark \
-  -url "http://localhost:8080/api/items?limit=20" \
-  -n 2000 \
-  -c 20
+./go-bench -url "http://localhost:8080/api/items?limit=20" -n 2000 -c 20
 ```
 
-### Authenticated POST endpoint
-
+### 2. Authenticated POST Endpoint
+Send 1,000 POST requests with JSON payload and auth headers:
 ```bash
-./api-benchmark \
+./go-bench \
   -url "http://localhost:8080/api/items" \
   -method POST \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Authorization: Bearer my_secret_token" \
   -data '{"name":"Example"}' \
   -n 1000 \
   -c 25 \
   -timeout 15s
 ```
 
-Authorization, cookie, API key, token, and secret header values are sent to the
-target normally but shown as `[REDACTED]` in reports.
+*Note: Authorization, cookie, API key, token, and secret header values are sent over the wire normally but displayed as `[REDACTED]` in reports.*
 
-### JSON output
-
-JSON mode writes one JSON object to standard output without progress text:
-
+### 3. Paced Requests
+Limit the benchmark to at most 2 new requests per second while allowing up to 5 overlapping requests:
 ```bash
-./api-benchmark \
-  -url "http://localhost:8080/api/items" \
-  -n 100 \
-  -c 10 \
-  -format json
+./go-bench \
+  -url "http://localhost:8080/api/analytics/dashboard" \
+  -n 50 \
+  -c 5 \
+  -rate 2
 ```
 
-Example output:
+### 4. Machine-Readable JSON Output
+Pipe benchmark statistics directly into `jq` or CI/CD pipelines:
+```bash
+./go-bench -url "http://localhost:8080/api/items" -n 100 -c 10 -format json
+```
 
+Example JSON output:
 ```json
 {
   "target": {
@@ -158,32 +161,11 @@ Example output:
 }
 ```
 
-### Paced requests
+---
 
-Limit the benchmark to at most two new requests per second while allowing up to
-five slow requests to overlap:
+## 📊 Sample Output
 
-```bash
-./api-benchmark \
-  -url "http://localhost:8080/api/analytics/dashboard?period=all&currency=NGN" \
-  -n 50 \
-  -c 5 \
-  -rate 2
-```
-
-Here, `-rate 2` starts no more than two requests per second, so request starts
-are spaced about 500 milliseconds apart. `-c 5` allows up to five requests to be
-running at the same time. If a request takes longer than 500 milliseconds, the
-next request may start while the earlier one is still running. If all five
-workers are busy, the next request waits, so the actual start rate becomes lower
-than two requests per second.
-
-Pacing does not bypass a target's rate limiter. It helps keep a benchmark below
-a known limit so successful endpoint behavior can be measured without producing
-mostly `429 Too Many Requests` responses.
-
-## Text Output
-
+### Text Mode (Default)
 ```text
 Benchmark Target: [GET] http://localhost:8080/api/items
 Requests: 100 | Concurrency: 10 | Rate: unlimited | Timeout: 10s
@@ -213,9 +195,7 @@ STATUS CODE DISTRIBUTION
 ==================================
 ```
 
-When requests fail before receiving an HTTP response, text output includes an
-error breakdown:
-
+When errors occur:
 ```text
 ==================================
 BENCHMARK SUMMARY
@@ -235,58 +215,21 @@ ERROR BREAKDOWN
 ==================================
 ```
 
-JSON output places the same counts in `summary.errors`. HTTP failures such as
-`429 Too Many Requests` appear in `summary.status_codes` because the server
-returned a response.
+---
 
-## Metric Semantics
+## 📐 Metric Semantics
 
-- **Elapsed time** is wall-clock benchmark execution time.
-- **Attempted requests** are requests that reached a worker and produced a result.
-- **Successful requests** have no execution error and a final status from 200 to
-  399.
-- **Failed requests** include non-success statuses, timeouts, connection errors,
-  truncated bodies, and cancellation errors.
-- **Estimated throughput** is attempted requests divided by elapsed seconds.
-- **Successful throughput** is successful requests divided by elapsed seconds.
-- **Request rate** limits how quickly requests may start. Slow responses can make
-  the actual request rate lower than this limit.
-- **Latency** starts before the HTTP exchange and ends after the complete response
-  body has been read and closed.
-- **Latency statistics** use successful requests only. Percentiles use the exact
-  nearest-rank method.
+- **Elapsed time**: Wall-clock benchmark execution time.
+- **Attempted requests**: Requests that reached a worker and produced a result.
+- **Successful requests**: Requests with no execution error and HTTP status `200-399`.
+- **Failed requests**: Non-success statuses (`4xx`, `5xx`), timeouts, connection drops, truncated response bodies, and cancellations.
+- **Estimated throughput**: Total attempted requests divided by elapsed seconds.
+- **Successful throughput**: Successful requests divided by elapsed seconds.
+- **Latency statistics**: Calculated strictly on successful requests using exact nearest-rank percentiles.
 
-A `429 Too Many Requests` response is therefore a failed request. It contributes
-to estimated throughput and status distribution, but not successful throughput or
-successful latency percentiles. The benchmark reports the target's rate limiting;
-it does not bypass it.
+---
 
-## Concurrency And Memory
-
-With `N` requests and concurrency `C`, the runner creates at most `min(N, C)`
-workers. Each worker handles requests sequentially, so no more than `C` requests
-are in flight.
-
-Job and result channel memory scales with concurrency. Request counts, status
-codes, and errors are aggregated as results arrive instead of retaining every
-full result. Exact percentiles still require one stored duration per successful
-request.
-
-The worker model is closed-loop: a worker starts its next request after its
-current request finishes. Optional rate pacing also limits how quickly jobs are
-handed to ready workers.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the complete execution flow and
-concurrency lifecycle.
-
-## Cancellation
-
-Interrupt signals and `SIGTERM` stop job production and cancel in-flight HTTP
-requests. The tool prints a partial report containing requests that actually
-started, then exits with an interruption error. `SIGKILL` cannot be handled by an
-application.
-
-## Testing
+## 🧪 Running Tests
 
 ```bash
 go test ./...
@@ -294,35 +237,36 @@ go test -race ./...
 go vet ./...
 ```
 
-Tests use local `httptest` servers and do not require an external API.
+---
 
-## Project Structure
+## 📁 Project Structure
 
 ```text
-.
-|-- cmd/
-|   |-- report/
-|   |   |-- report.go
-|   |   `-- report_test.go
-|   `-- root.go
-|-- internal/
-|   |-- config/
-|   |   |-- config.go
-|   |   `-- config_test.go
-|   |-- runner/
-|   |   |-- runner.go
-|   |   |-- runner_test.go
-|   |   `-- worker.go
-|   `-- stats/
-|       |-- result.go
-|       |-- stats.go
-|       `-- stats_test.go
-|-- ARCHITECTURE.md
-|-- README.md
-|-- go.mod
-`-- main.go
+go-bench/
+├── cmd/
+│   ├── report/
+│   │   ├── report.go        # Terminal & JSON presentation formatting
+│   │   └── report_test.go   # Redaction and formatting unit tests
+│   └── root.go              # CLI flags & coordination
+├── internal/
+│   ├── config/
+│   │   ├── config.go        # Configuration models & RFC-compliant validation
+│   │   └── config_test.go   # Configuration validation test suite
+│   ├── runner/
+│   │   ├── runner.go        # Worker pool, rate-pacer, & cancellation lifecycle
+│   │   ├── runner_test.go   # Concurrency, pacing, & cancellation tests
+│   │   └── worker.go        # HTTP client, connection pooling, & request executor
+│   └── stats/
+│       ├── result.go        # Result structs & latency definitions
+│       ├── stats.go         # Streaming stats accumulator & percentiles
+│       └── stats_test.go    # Latency percentiles & stats tests
+├── ARCHITECTURE.md          # Architectural deep-dive & design documentation
+├── README.md                # Project documentation
+├── go.mod                   # Go module definition
+└── main.go                  # Signal context & entry point
 ```
 
-Run load tests against disposable test environments or disposable data whenever
-possible. Requests to endpoints that create, update, or delete data can produce
-real side effects.
+---
+
+## 📄 License
+This project is open source and available under the [MIT License](LICENSE).
